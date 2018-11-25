@@ -2,10 +2,18 @@
   "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
   "contentVersion": "1.0.0.0",
   "parameters": {
-    "location": {
+    "vmName": {
       "type": "string",
+      "maxLength": 15,
       "metadata": {
-        "description": "location"
+        "description": "Name for the first Virtual Firewall"
+      }
+    },
+    "vm2Name": {
+      "type": "string",
+      "maxLength": 15,
+      "metadata": {
+        "description": "Name for the second Virtual Firewall"
       }
     },
     "adminUsername": {
@@ -20,10 +28,10 @@
         "description": "Password for the Virtual Machine."
       }
     },
-    "FortiGateNamePrefix": {
+    "availabilitySetName": {
       "type": "string",
       "metadata": {
-        "description": "Name for FortiGate virtual appliances (A & B will be appended to the end of each respectively)."
+        "description": "Availability Set name that we should deploy the Firewall into"
       }
     },
     "FortiGateImageSKU": {
@@ -41,72 +49,25 @@
       "type": "string",
       "defaultValue": "latest",
       "allowedValues": [
-        "5.2.9",
-        "5.4.6",
-        "5.6.2",
+        "5.6.6",
+        "6.0.2",
+        "6.0.3",
         "latest"
       ],
       "metadata": {
-        "description": "5.6.2 is latest version for BYOL and PAYG; 5.2.9 is previous BYOL; 5.4.3 is previous PAYG."
+        "description": "Select image version."
       }
     },
-    "instanceType": {
+    "vmSize": {
       "type": "string",
-      "defaultValue": "Standard_F4",
-      "metadata": {
-        "description": "Virtual Machine size selection"
-      }
-    },
-    "publicIPNewOrExistingOrNone": {
-      "type": "string",
-      "defaultValue": "new",
+      "defaultValue": "Standard_F4s",
       "allowedValues": [
-        "new",
-        "existing",
-        "none"
+        "Standard_F2s",
+        "Standard_F4s",
+        "Standard_F8s"
       ],
       "metadata": {
-        "description": "Identify if to use a public IP, and if so whether it's new"
-      }
-    },
-    "publicIP2NewOrExistingOrNone": {
-      "type": "string",
-      "defaultValue": "new",
-      "allowedValues": [
-        "new",
-        "existing",
-        "none"
-      ],
-      "metadata": {
-        "description": "Whether to use a public IP and if so whether it is new"
-      }
-    },
-    "publicIPAddressName": {
-      "type": "string",
-      "defaultValue": "",
-      "metadata": {
-        "description": "Name of Public IP address element."
-      }
-    },
-    "publicIPAddressResourceGroup": {
-      "type": "string",
-      "defaultValue": "",
-      "metadata": {
-        "description": "Resource group to which the Public IP belongs."
-      }
-    },
-    "publicIPAddress2Name": {
-      "type": "string",
-      "defaultValue": "",
-      "metadata": {
-        "description": "Name of Public IP address element."
-      }
-    },
-    "publicIPAddress2ResourceGroup": {
-      "type": "string",
-      "defaultValue": "",
-      "metadata": {
-        "description": "Resource group to which the Public IP belongs."
+          "description": "Virtual Machine size selection"
       }
     },
     "publicIPAddressType": {
@@ -117,17 +78,6 @@
       ],
       "metadata": {
         "description": "Type of public IP address - for preview 'Standard' load balancer, static IPs are required."
-      }
-    },
-    "vnetNewOrExisting": {
-      "type": "string",
-      "defaultValue": "new",
-      "allowedValues": [
-        "new",
-        "existing"
-      ],
-      "metadata": {
-        "description": "Identify whether to use a new or existing vnet"
       }
     },
     "vnetName": {
@@ -143,581 +93,176 @@
         "description": "Resource Group containing the virtual network - or new resource group from above (if new vnet)"
       }
     },
-    "vnetAddressPrefix": {
-      "type": "string",
-      "defaultValue": "",
-      "metadata": {
-        "description": "Virtual Network Address prefix"
-      }
-    },
     "Subnet1Name": {
       "type": "string",
       "defaultValue": "",
       "metadata": {
-        "description": "Subnet 1 Name"
-      }
-    },
-    "Subnet1Prefix": {
-      "type": "string",
-      "defaultValue": "",
-      "metadata": {
-        "description": "Subnet 1 Prefix"
-      }
-    },
-    "subnet1LoadBalancerIP": {
-      "type": "string",
-      "metadata": {
-        "description": "Static IP for public facing NIC of the FortiGate virtual appliance."
+        "description": "Subnet 1 Name - external"
       }
     },
     "Subnet2Name": {
       "type": "string",
       "defaultValue": "",
       "metadata": {
-        "description": "Subnet 2 Name"
-      }
-    },
-    "Subnet2Prefix": {
-      "type": "string",
-      "defaultValue": "",
-      "metadata": {
-        "description": "Subnet 2 Prefix"
+        "description": "Subnet 2 Name - internal"
       }
     },
     "subnet2LoadBalancerIP": {
       "type": "string",
       "metadata": {
-        "description": "Static IP for protected network facing NIC of the FortiGate virtual appliance."
+        "description": "Static IP for internal LB on the internal subnet."
       }
     },
     "Subnet3Name": {
       "type": "string",
       "defaultValue": "",
       "metadata": {
-        "description": "Subnet 3 Name"
-      }
-    },
-    "Subnet3Prefix": {
-      "type": "string",
-      "defaultValue": "",
-      "metadata": {
-        "description": "Subnet 3 Prefix"
-      }
-    },
-    "subnet3LoadBalancerIP": {
-      "type": "string",
-      "metadata": {
-        "description": "Static IP for protected network facing NIC of the FortiGate virtual appliance."
+        "description": "Subnet 3 Name - management subnet"
       }
     },
     "Subnet4Name": {
       "type": "string",
       "defaultValue": "",
       "metadata": {
-        "description": "Subnet 4 Name"
+        "description": "Subnet 4 Name - diagnostic subnet"
       }
     },
-    "Subnet4Prefix": {
+    "internalLBName": {
       "type": "string",
       "defaultValue": "",
       "metadata": {
-        "description": "Subnet 4 Prefix"
+        "description": "Internal Load Balancer Name"
       }
     },
-    "subnet4LoadBalancerIP": {
+    "publicLBName": {
       "type": "string",
+      "defaultValue": "",
       "metadata": {
-        "description": "Static IP for protected network facing NIC of the FortiGate virtual appliance."
+        "description": "External Load Balancer Name"
       }
     },
-    "FortinetTags": {
-    "type": "object",
-    "defaultValue": {
-      "provider": "6EB3B02F-50E5-4A3E-8CB8-2E129258317D"
-      }
-    },
-    "artifactsBaseUrl": {
-      "type": "string",
-      "defaultValue": "https://raw.githubusercontent.com/fortinetclouddev/FortiGate-HA-for-Azure/4NIC-HAPorts",
+    "tags": {
+      "type": "object",
       "metadata": {
-        "description": "Base URL of the solution template gallery package",
-        "artifactsBaseUrl": ""
+        "description": "Resource Tags"
       }
     }
   },
   "variables": {
-    "compute_AvailabilitySet_FG_Name": "[concat(parameters('FortiGateNamePrefix'),'-AvailabilitySet')]",
-    "compute_AvailabilitySet_FG_Id": "[resourceId('Microsoft.Compute/availabilitySets', variables('compute_AvailabilitySet_FG_Name'))]",
-
-    "vmSize": "[parameters('instanceType')]",
-
-    "VNetName": "[parameters('vnetName')]",
-    "Subnet1Name": "[parameters('Subnet1Name')]",
-    "Subnet2Name": "[parameters('Subnet2Name')]",
-    "Subnet3Name": "[parameters('Subnet3Name')]",
-    "Subnet4Name": "[parameters('Subnet4Name')]",
+    "availabilitySetId": "[resourceId('Microsoft.Compute/availabilitySets', parameters('availabilitySetName'))]",
 
     "vnetID": "[resourceId(parameters('vnetResourceGroup'),'Microsoft.Network/virtualNetworks', parameters('vnetName'))]",
-    "subnet1Ref": "[concat(variables('vnetID'),'/subnets/', variables('Subnet1Name'))]",
-    "subnet2Ref": "[concat(variables('vnetID'),'/subnets/', variables('Subnet2Name'))]",
-    "subnet3Ref": "[concat(variables('vnetID'),'/subnets/', variables('Subnet3Name'))]",
-    "subnet4Ref": "[concat(variables('vnetID'),'/subnets/', variables('Subnet4Name'))]",
+    "subnet1Ref": "[concat(variables('vnetID'),'/subnets/', parameters('Subnet1Name'))]",
+    "subnet2Ref": "[concat(variables('vnetID'),'/subnets/', parameters('Subnet2Name'))]",
+    "subnet3Ref": "[concat(variables('vnetID'),'/subnets/', parameters('Subnet3Name'))]",
+    "subnet4Ref": "[concat(variables('vnetID'),'/subnets/', parameters('Subnet4Name'))]",
 
-    "VNetAddressPrefix": "[parameters('vnetAddressPrefix')]",
-    "Subnet1Prefix": "[parameters('Subnet1Prefix')]",
-    "Subnet2Prefix": "[parameters('Subnet2Prefix')]",
-    "Subnet3Prefix": "[parameters('Subnet3Prefix')]",
-    "Subnet4Prefix": "[parameters('Subnet4Prefix')]",
+    "internalLBFEName": "[concat(parameters('internalLBName'),'-',parameters('Subnet2Name'),'-FrontEnd')]",
+    "internalLBBEName": "[concat(parameters('internalLBName'),'-',parameters('Subnet2Name'),'-BackEnd')]",
 
-    "vmName": "[concat(parameters('FortiGateNamePrefix'),'-A')]",
-    "vm2Name": "[concat(parameters('FortiGateNamePrefix'),'-B')]",
+    "internalLBid": "[resourceID('Microsoft.Network/loadBalancers',parameters('internalLBName'))]",
+    "internalLB_BEId": "[concat(variables('internalLBid'),'/backendAddressPools/',variables('internalLBBEName'))]",
 
-    "routeTable1Name": "[concat(variables('Subnet1Name'),'-',parameters('FortiGateNamePrefix'),'RouteTable')]",
-    "routeTable2Name": "[concat(variables('Subnet2Name'),'-',parameters('FortiGateNamePrefix'),'RouteTable')]",
-    "routeTable3Name": "[concat(variables('Subnet3Name'),'-',parameters('FortiGateNamePrefix'),'RouteTable')]",
-    "routeTable4Name": "[concat(variables('Subnet4Name'),'-',parameters('FortiGateNamePrefix'),'RouteTable')]",
+    "publicIPAddressName": "[concat(parameters('publicLBName'), '-ipv4-publicip')]",
+    "publicIPID": "[resourceID('Microsoft.Network/publicIPAddresses',variables('publicIPAddressName'))]",
+    "publicIPDNSName": "[concat('smithsbis', parameters('publicLBName'))]",
 
+    "network_LB_Public_Id": "[resourceId('Microsoft.Network/loadBalancers',parameters('publicLBName'))]",
+    "network_LB_Public_FEName": "publicLBFE01",
+    "network_LB_Public_FEId": "[concat(variables('network_LB_Public_Id'),'/frontendIPConfigurations/',variables('network_LB_Public_FEName'))]",
+    "network_LB_Public_BEName": "publicLBBE01",
+    "network_LB_Public_BEId": "[concat(variables('network_LB_Public_Id'),'/backendAddressPools/',variables('network_LB_Public_BEName'))]",
+    "network_LB_Public_NatRule_SSH_fg1_Name": "SSH01",
+    "network_LB_Public_NatRule_SSH_fg1_Id": "[concat(variables('network_LB_Public_Id'),'/inboundNatRules/',variables('network_LB_Public_NatRule_SSH_fg1_Name'))]",
+    "network_LB_Public_NatRule_FGAdminPerm_fg1_Name": "FGAdminPerm01",
+    "network_LB_Public_NatRule_FGAdminPerm_fg1_Id": "[concat(variables('network_LB_Public_Id'),'/inboundNatRules/',variables('network_LB_Public_NatRule_FGAdminPerm_fg1_Name'))]",
 
-    "subnet1KnownIP": "[parameters('subnet1LoadBalancerIP')]",
-    "subnet2KnownIP": "[parameters('subnet2LoadBalancerIP')]",
-    "subnet3KnownIP": "[parameters('subnet3LoadBalancerIP')]",
-    "subnet4KnownIP": "[parameters('subnet4LoadBalancerIP')]",
+    "vm1PublicIPName": "[concat(parameters('vmName'), '-ipv4-publicip')]",
+    "vm1PublicIPID": "[resourceID('Microsoft.Network/publicIPAddresses',variables('vm1PublicIPName'))]",
+    "vm1PublicIPDNSName": "[concat('smithsbis', parameters('vmName'))]",
+    "vm2PublicIPName": "[concat(parameters('vm2Name'), '-ipv4-publicip')]",
+    "vm2PublicIPID": "[resourceID('Microsoft.Network/publicIPAddresses',variables('vm2PublicIPName'))]",
+    "vm2PublicIPDNSName": "[concat('smithsbis', parameters('vm2Name'))]",
 
-
-    "internalLBName": "[concat(parameters('FortiGateNamePrefix'),'-InternalLoadBalancer')]",
-    "internalLBFE1Name": "[concat(parameters('FortiGateNamePrefix'),'-ILB-',variables('Subnet1Name'),'-FrontEnd')]",
-    "internalLBFE2Name": "[concat(parameters('FortiGateNamePrefix'),'-ILB-',variables('Subnet2Name'),'-FrontEnd')]",
-    "internalLBFE3Name": "[concat(parameters('FortiGateNamePrefix'),'-ILB-',variables('Subnet3Name'),'-FrontEnd')]",
-    "internalLBFE4Name": "[concat(parameters('FortiGateNamePrefix'),'-ILB-',variables('Subnet4Name'),'-FrontEnd')]",
-
-    "internalLBBE1Name": "[concat(parameters('FortiGateNamePrefix'),'-ILB-',variables('Subnet1Name'),'-BackEnd')]",
-    "internalLBBE2Name": "[concat(parameters('FortiGateNamePrefix'),'-ILB-',variables('Subnet2Name'),'-BackEnd')]",
-    "internalLBBE3Name": "[concat(parameters('FortiGateNamePrefix'),'-ILB-',variables('Subnet3Name'),'-BackEnd')]",
-    "internalLBBE4Name": "[concat(parameters('FortiGateNamePrefix'),'-ILB-',variables('Subnet4Name'),'-BackEnd')]",
-
-    "internalLBid": "[resourceID('Microsoft.Network/loadBalancers',variables('internalLBName'))]",
-    "internalLB_BE1Id": "[concat(variables('internalLBid'),'/backendAddressPools/',variables('internalLBBE1Name'))]",
-    "internalLB_BE2Id": "[concat(variables('internalLBid'),'/backendAddressPools/',variables('internalLBBE2Name'))]",
-    "internalLB_BE3Id": "[concat(variables('internalLBid'),'/backendAddressPools/',variables('internalLBBE3Name'))]",
-    "internalLB_BE4Id": "[concat(variables('internalLBid'),'/backendAddressPools/',variables('internalLBBE4Name'))]",
-
-    "apiVer": "2015-06-15",
-    "compute_VM_fg1_Name": "[variables('vmName')]",
-    "compute_VM_fg2_Name": "[variables('vm2Name')]",
-
-    "network_NIC_fg11_Name": "[concat(variables('vmName'),'Nic0')]",
+    "network_NIC_fg11_Name": "[concat(parameters('vmName'),'Nic0')]",
     "network_NIC_fg11_Id": "[resourceId('Microsoft.Network/networkInterfaces',variables('network_NIC_fg11_Name'))]",
-    "network_NIC_fg12_Name": "[concat(variables('vmName'),'Nic1')]",
+    "network_NIC_fg12_Name": "[concat(parameters('vmName'),'Nic1')]",
     "network_NIC_fg12_Id": "[resourceId('Microsoft.Network/networkInterfaces',variables('network_NIC_fg12_Name'))]",
-    "network_NIC_fg13_Name": "[concat(variables('vmName'),'Nic2')]",
+    "network_NIC_fg13_Name": "[concat(parameters('vmName'),'Nic2')]",
     "network_NIC_fg13_Id": "[resourceId('Microsoft.Network/networkInterfaces',variables('network_NIC_fg13_Name'))]",
-    "network_NIC_fg14_Name": "[concat(variables('vmName'),'Nic3')]",
+    "network_NIC_fg14_Name": "[concat(parameters('vmName'),'Nic3')]",
     "network_NIC_fg14_Id": "[resourceId('Microsoft.Network/networkInterfaces',variables('network_NIC_fg14_Name'))]",
 
-    "network_NIC_fg21_Name": "[concat(variables('vm2Name'),'Nic0')]",
+    "network_NIC_fg21_Name": "[concat(parameters('vm2Name'),'Nic0')]",
     "network_NIC_fg21_Id": "[resourceId('Microsoft.Network/networkInterfaces',variables('network_NIC_fg21_Name'))]",
-    "network_NIC_fg22_Name": "[concat(variables('vm2Name'),'Nic1')]",
+    "network_NIC_fg22_Name": "[concat(parameters('vm2Name'),'Nic1')]",
     "network_NIC_fg22_Id": "[resourceId('Microsoft.Network/networkInterfaces',variables('network_NIC_fg22_Name'))]",
-    "network_NIC_fg23_Name": "[concat(variables('vm2Name'),'Nic2')]",
+    "network_NIC_fg23_Name": "[concat(parameters('vm2Name'),'Nic2')]",
     "network_NIC_fg23_Id": "[resourceId('Microsoft.Network/networkInterfaces',variables('network_NIC_fg23_Name'))]",
-    "network_NIC_fg24_Name": "[concat(variables('vm2Name'),'Nic3')]",
-    "network_NIC_fg24_Id": "[resourceId('Microsoft.Network/networkInterfaces',variables('network_NIC_fg24_Name'))]",
-
-    "publicIPSetupURL": "[concat(parameters('artifactsBaseUrl'),'/','publicip-',parameters('publicIPNewOrExistingOrNone'),'-',parameters('publicIP2NewOrExistingOrNone'),'.json')]",
-    "virtualNetworkSetupURL": "[concat(parameters('artifactsBaseUrl'),'/','vnet-',parameters('vnetNewOrExisting'),'.json')]"
+    "network_NIC_fg24_Name": "[concat(parameters('vm2Name'),'Nic3')]",
+    "network_NIC_fg24_Id": "[resourceId('Microsoft.Network/networkInterfaces',variables('network_NIC_fg24_Name'))]"
   },
   "resources": [
     {
       "type": "Microsoft.Compute/availabilitySets",
-      "name": "[variables('compute_AvailabilitySet_FG_Name')]",
-      "apiVersion": "2017-03-30",
-      "tags": {
-       "provider": "[toUpper(parameters('FortinetTags').provider)]"
-      },
-      "location": "[parameters('location')]",
+      "name": "[parameters('availabilitySetName')]",
+      "apiVersion": "2018-10-01",
+      "tags": "[parameters('tags')]",
+      "location": "[resourceGroup().location]",
       "properties": {
-        "platformFaultDomainCount": "2",
-        "platformUpdateDomainCount": "2"
+        "platformFaultDomainCount": 3,
+        "platformUpdateDomainCount": 5
       },
       "sku": {
         "name":  "Aligned"
       }
     },
     {
-      "type": "Microsoft.Network/routeTables",
-      "name": "[variables('routeTable1Name')]",
-      "apiVersion": "[variables('apiVer')]",
-      "tags": {
-       "provider": "[toUpper(parameters('FortinetTags').provider)]"
-      },
-      "location": "[parameters('location')]",
-      "properties": {
-        "routes": [
-          {
-            "name": "[concat('to',variables('Subnet2Name'))]",
-            "properties": {
-              "addressPrefix": "[variables('subnet2Prefix')]",
-              "nextHopType": "VirtualAppliance",
-              "nextHopIpAddress": "[variables('subnet1KnownIP')]"
-            }
-          },
-           {
-            "name": "[concat('to',variables('Subnet3Name'))]",
-            "properties": {
-              "addressPrefix": "[variables('subnet3Prefix')]",
-              "nextHopType": "VirtualAppliance",
-              "nextHopIpAddress": "[variables('subnet1KnownIP')]"
-            }
-          },
-           {
-            "name": "[concat('to',variables('Subnet4Name'))]",
-            "properties": {
-              "addressPrefix": "[variables('subnet4Prefix')]",
-              "nextHopType": "VirtualAppliance",
-              "nextHopIpAddress": "[variables('subnet1KnownIP')]"
-            }
-          }
-        ]
-      }
-    },
-    {
-      "type": "Microsoft.Network/routeTables",
-      "name": "[variables('routeTable2Name')]",
-      "apiVersion": "[variables('apiVer')]",
-      "tags": {
-       "provider": "[toUpper(parameters('FortinetTags').provider)]"
-      },
-      "location": "[parameters('location')]",
-      "properties": {
-        "routes": [
-          {
-            "name": "[concat('to',variables('Subnet1Name'))]",
-            "properties": {
-              "addressPrefix": "[variables('subnet1Prefix')]",
-              "nextHopType": "VirtualAppliance",
-              "nextHopIpAddress": "[variables('subnet2KnownIP')]"
-            }
-          },
-          {
-            "name": "[concat('to',variables('Subnet3Name'))]",
-            "properties": {
-              "addressPrefix": "[variables('subnet3Prefix')]",
-              "nextHopType": "VirtualAppliance",
-              "nextHopIpAddress": "[variables('subnet2KnownIP')]"
-            }
-          },
-          {
-            "name": "[concat('to',variables('Subnet4Name'))]",
-            "properties": {
-              "addressPrefix": "[variables('subnet4Prefix')]",
-              "nextHopType": "VirtualAppliance",
-              "nextHopIpAddress": "[variables('subnet2KnownIP')]"
-            }
-          },
-          {
-            "name": "toDefault",
-            "properties": {
-              "AddressPrefix": "0.0.0.0/0",
-              "nextHopType": "VirtualAppliance",
-              "nextHopIPAddress": "[variables('subnet2KnownIP')]"
-            }
-          }
-        ]
-      }
-    },
-    {
-      "type": "Microsoft.Network/routeTables",
-      "name": "[variables('routeTable3Name')]",
-      "apiVersion": "[variables('apiVer')]",
-      "tags": {
-       "provider": "[toUpper(parameters('FortinetTags').provider)]"
-      },
-      "location": "[parameters('location')]",
-      "properties": {
-        "routes": [
-          {
-            "name": "[concat('to',variables('Subnet1Name'))]",
-            "properties": {
-              "addressPrefix": "[variables('subnet1Prefix')]",
-              "nextHopType": "VirtualAppliance",
-              "nextHopIpAddress": "[variables('subnet3KnownIP')]"
-            }
-          },
-          {
-            "name": "[concat('to',variables('Subnet2Name'))]",
-            "properties": {
-              "addressPrefix": "[variables('subnet2Prefix')]",
-              "nextHopType": "VirtualAppliance",
-              "nextHopIpAddress": "[variables('subnet3KnownIP')]"
-            }
-          },
-          {
-            "name": "[concat('to',variables('Subnet4Name'))]",
-            "properties": {
-              "addressPrefix": "[variables('subnet4Prefix')]",
-              "nextHopType": "VirtualAppliance",
-              "nextHopIpAddress": "[variables('subnet3KnownIP')]"
-            }
-          },
-          {
-            "name": "toDefault",
-            "properties": {
-              "AddressPrefix": "0.0.0.0/0",
-              "nextHopType": "VirtualAppliance",
-              "nextHopIPAddress": "[variables('subnet3KnownIP')]"
-            }
-          }
-        ]
-      }
-    },
-    {
-      "type": "Microsoft.Network/routeTables",
-      "name": "[variables('routeTable4Name')]",
-      "apiVersion": "[variables('apiVer')]",
-      "tags": {
-       "provider": "[toUpper(parameters('FortinetTags').provider)]"
-      },
-      "location": "[parameters('location')]",
-      "properties": {
-        "routes": [
-          {
-            "name": "[concat('to',variables('Subnet1Name'))]",
-            "properties": {
-              "addressPrefix": "[variables('subnet1Prefix')]",
-              "nextHopType": "VirtualAppliance",
-              "nextHopIpAddress": "[variables('subnet4KnownIP')]"
-            }
-          },
-          {
-            "name": "[concat('to',variables('Subnet2Name'))]",
-            "properties": {
-              "addressPrefix": "[variables('subnet2Prefix')]",
-              "nextHopType": "VirtualAppliance",
-              "nextHopIpAddress": "[variables('subnet4KnownIP')]"
-            }
-          },
-          {
-            "name": "[concat('to',variables('Subnet3Name'))]",
-            "properties": {
-              "addressPrefix": "[variables('subnet3Prefix')]",
-              "nextHopType": "VirtualAppliance",
-              "nextHopIpAddress": "[variables('subnet4KnownIP')]"
-            }
-          },
-          {
-            "name": "toDefault",
-            "properties": {
-              "AddressPrefix": "0.0.0.0/0",
-              "nextHopType": "VirtualAppliance",
-              "nextHopIPAddress": "[variables('subnet4KnownIP')]"
-            }
-          }
-        ]
-      }
-    },
-    {
-      "name": "SettingUpVirtualNetwork",
-      "type": "Microsoft.Resources/deployments",
-      "apiVersion": "2015-01-01",
-      "dependsOn": [
-        "[concat('Microsoft.Network/routeTables/', variables('routeTable1Name'))]",
-        "[concat('Microsoft.Network/routeTables/', variables('routeTable2Name'))]",
-        "[concat('Microsoft.Network/routeTables/', variables('routeTable3Name'))]",
-        "[concat('Microsoft.Network/routeTables/', variables('routeTable4Name'))]"
-      ],
-      "properties": {
-        "mode": "Incremental",
-        "templateLink": {
-          "uri": "[variables('virtualNetworkSetupURL')]",
-          "contentVersion": "1.0.0.0"
-        },
-        "parameters": {
-          "vnetName": {
-            "value": "[parameters('vnetName')]"
-          },
-          "location": {
-            "value": "[parameters('location')]"
-          },
-          "vnetAddressPrefix": {
-            "value": "[parameters('vnetAddressPrefix')]"
-          },
-          "subnet1Name": {
-            "value": "[parameters('Subnet1Name')]"
-          },
-          "subnet1AddressPrefix": {
-            "value": "[parameters('Subnet1Prefix')]"
-          },
-          "subnet2Name": {
-            "value": "[parameters('Subnet2Name')]"
-          },
-          "subnet2AddressPrefix": {
-            "value": "[parameters('Subnet2Prefix')]"
-          },
-          "subnet3Name": {
-            "value": "[parameters('Subnet3Name')]"
-          },
-          "subnet3AddressPrefix": {
-            "value": "[parameters('Subnet3Prefix')]"
-          },
-          "subnet4Name": {
-            "value": "[parameters('Subnet4Name')]"
-          },
-          "subnet4AddressPrefix": {
-            "value": "[parameters('Subnet4Prefix')]"
-          },
-          "vnetResourceGroup": {
-            "value": "[parameters('vnetResourceGroup')]"
-          },
-          "routeTable1Name": {
-            "value": "[variables('routeTable1Name')]"
-          },
-          "routeTable2Name": {
-            "value": "[variables('routeTable2Name')]"
-          },
-          "routeTable3Name": {
-            "value": "[variables('routeTable3Name')]"
-          },
-          "routeTable4Name": {
-            "value": "[variables('routeTable4Name')]"
-          },
-          "FortinetTags": {
-            "value": "[parameters('FortinetTags')]"
-          }
-        }
-      }
-    },
-    {
       "type": "Microsoft.Network/loadBalancers",
-      "name": "[variables('internalLBName')]",
-      "apiVersion": "2017-08-01",
-      "tags": {
-       "provider": "[toUpper(parameters('FortinetTags').provider)]"
-      },
-      "location": "[parameters('location')]",
+      "name": "[parameters('internalLBName')]",
+      "apiVersion": "2018-10-01",
+      "tags": "[parameters('tags')]",
+      "location": "[resourceGroup().location]",
       "sku": {
         "name": "Standard"
       },
-      "dependsOn": [
-        "[concat('Microsoft.Network/routeTables/', variables('routeTable1Name'))]",
-        "[concat('Microsoft.Network/routeTables/', variables('routeTable2Name'))]",
-        "[concat('Microsoft.Network/routeTables/', variables('routeTable3Name'))]",
-        "[concat('Microsoft.Network/routeTables/', variables('routeTable4Name'))]",
-        "[concat('Microsoft.Resources/deployments/', 'SettingUpVirtualNetwork')]"
-      ],
       "properties": {
         "frontendIPConfigurations": [
           {
-            "name": "[variables('internalLBFE1Name')]",
+            "name": "[variables('internalLBFEName')]",
             "properties": {
-              "privateIPAddress": "[variables('subnet1KnownIP')]",
-              "privateIPAllocationMethod": "Static",
-              "subnet": {
-                "id": "[variables('subnet1Ref')]"
-              }
-            }
-          },
-          {
-            "name": "[variables('internalLBFE2Name')]",
-            "properties": {
-              "privateIPAddress": "[variables('subnet2KnownIP')]",
+              "privateIPAddress": "[parameters('subnet2LoadBalancerIP')]",
               "privateIPAllocationMethod": "Static",
               "subnet": {
                 "id": "[variables('subnet2Ref')]"
-              }
-            }
-          },
-          {
-            "name": "[variables('internalLBFE3Name')]",
-            "properties": {
-              "privateIPAddress": "[variables('subnet3KnownIP')]",
-              "privateIPAllocationMethod": "Static",
-              "subnet": {
-                "id": "[variables('subnet3Ref')]"
-              }
-            }
-          },
-          {
-            "name": "[variables('internalLBFE4Name')]",
-            "properties": {
-              "privateIPAddress": "[variables('subnet4KnownIP')]",
-              "privateIPAllocationMethod": "Static",
-              "subnet": {
-                "id": "[variables('subnet4Ref')]"
               }
             }
           }
         ],
         "backendAddressPools": [
           {
-            "name": "[variables('internalLBBE1Name')]"
-          },
-          {
-            "name": "[variables('internalLBBE2Name')]"
-          },
-                    {
-            "name": "[variables('internalLBBE3Name')]"
-          },
-          {
-            "name": "[variables('internalLBBE4Name')]"
+            "name": "[variables('internalLBBEName')]"
           }
         ],
         "loadBalancingRules": [
           {
             "properties": {
               "frontendIPConfiguration": {
-                "id": "[concat(resourceId('Microsoft.Network/loadBalancers', variables('internalLBName')), '/frontendIpConfigurations/', variables('internalLBFE2Name'))]"
+                "id": "[concat(resourceId('Microsoft.Network/loadBalancers', parameters('internalLBName')), '/frontendIpConfigurations/', variables('internalLBFEName'))]"
               },
               "backendAddressPool": {
-                "id": "[concat(resourceId('Microsoft.Network/loadBalancers', variables('internalLBName')), '/backendAddressPools/', variables('internalLBBE2Name'))]"
+                "id": "[concat(resourceId('Microsoft.Network/loadBalancers', parameters('internalLBName')), '/backendAddressPools/', variables('internalLBBEName'))]"
               },
               "probe": {
-                "id": "[concat(resourceId('Microsoft.Network/loadBalancers', variables('internalLBName')), '/probes/lbprobe')]"
+                "id": "[concat(resourceId('Microsoft.Network/loadBalancers', parameters('internalLBName')), '/probes/lbprobe')]"
               },
-              "protocol": "all",
+              "protocol": "All",
               "frontendPort": 0,
               "backendPort": 0,
               "enableFloatingIP": true,
               "idleTimeoutInMinutes": 15
             },
             "name": "lbruleFE2all"
-          },
-          {
-            "properties": {
-              "frontendIPConfiguration": {
-                "id": "[concat(resourceId('Microsoft.Network/loadBalancers', variables('internalLBName')), '/frontendIpConfigurations/', variables('internalLBFE3Name'))]"
-              },
-              "backendAddressPool": {
-                "id": "[concat(resourceId('Microsoft.Network/loadBalancers', variables('internalLBName')), '/backendAddressPools/', variables('internalLBBE3Name'))]"
-              },
-              "probe": {
-                "id": "[concat(resourceId('Microsoft.Network/loadBalancers', variables('internalLBName')), '/probes/lbprobe')]"
-              },
-              "protocol": "all",
-              "frontendPort": 0,
-              "backendPort": 0,
-              "enableFloatingIP": true,
-              "idleTimeoutInMinutes": 15
-            },
-            "name": "lbruleFE3all"
-          },
-          {
-            "properties": {
-              "frontendIPConfiguration": {
-                "id": "[concat(resourceId('Microsoft.Network/loadBalancers', variables('internalLBName')), '/frontendIpConfigurations/', variables('internalLBFE4Name'))]"
-              },
-              "backendAddressPool": {
-                "id": "[concat(resourceId('Microsoft.Network/loadBalancers', variables('internalLBName')), '/backendAddressPools/', variables('internalLBBE4Name'))]"
-              },
-              "probe": {
-                "id": "[concat(resourceId('Microsoft.Network/loadBalancers', variables('internalLBName')), '/probes/lbprobe')]"
-              },
-              "protocol": "all",
-              "frontendPort": 0,
-              "backendPort": 0,
-              "enableFloatingIP": true,
-              "idleTimeoutInMinutes": 15
-            },
-            "name": "lbruleFE4all"
           }
         ],
         "probes": [
@@ -734,76 +279,221 @@
       }
     },
     {
-      "apiVersion": "2015-01-01",
-      "type": "Microsoft.Resources/deployments",
-      "name": "SettingUpPublicIPandFollowing",
-      "dependsOn": [
-        "[concat('Microsoft.Network/loadBalancers/', variables('internalLBName'))]",
-        "[concat('Microsoft.Resources/deployments/', 'SettingUpVirtualNetwork')]"
-      ],
+      "type": "Microsoft.Network/publicIPAddresses",
+      "name": "[variables('publicIPAddressName')]",
+      "apiVersion": "2018-10-01",
+      "tags": "[parameters('tags')]",
+      "location": "[resourceGroup().location]",
+      "sku": 
+      {
+        "name": "Standard"
+      },
       "properties": {
-        "mode": "Incremental",
-        "templateLink": {
-          "uri": "[variables('publicIPSetupURL')]",
-          "contentVersion": "1.0.0.0"
-        },
-        "parameters": {
-          "location": {
-            "value": "[parameters('location')]"
-          },
-          "vmNamePrefix": {
-            "value": "[parameters('FortiGateNamePrefix')]"
-          },
-          "publicIPAddressName": {
-            "value": "[parameters('publicIPAddressName')]"
-          },
-          "publicIPAddress2Name": {
-            "value": "[parameters('publicIPAddress2Name')]"
-          },
-          "publicIPAddressType": {
-            "value": "[parameters('publicIPAddressType')]"
-          },
-          "publicIPAddressResourceGroup": {
-            "value": "[parameters('publicIPAddressResourceGroup')]"
-          },
-          "publicIPAddress2ResourceGroup": {
-            "value": "[parameters('publicIPAddressResourceGroup')]"
-          },
-          "VMName": {
-            "value": "[variables('vmName')]"
-          },
-          "VM2Name": {
-            "value": "[variables('vm2Name')]"
-          },
-          "subnet1Ref": {
-            "value": "[variables('subnet1Ref')]"
-          },
-          "network_NIC_fg11_Name": {
-            "value": "[variables('network_NIC_fg11_Name')]"
-          },
-          "network_NIC_fg21_Name": {
-            "value": "[variables('network_NIC_fg21_Name')]"
-          },
-          "internalLB_BE1Id": {
-            "value": "[variables('internalLB_BE1Id')]"
-          },
-          "FortinetTags": {
-            "value": "[parameters('FortinetTags')]"
-          }
+        "publicIPAllocationMethod": "[parameters('publicIPAddressType')]",
+        "dnsSettings": {
+          "domainNameLabel": "[variables('publicIPDNSName')]"
         }
       }
     },
     {
-      "apiVersion": "[variables('apiVer')]",
-      "tags": {
-       "provider": "[toUpper(parameters('FortinetTags').provider)]"
+      "type": "Microsoft.Network/publicIPAddresses",
+      "name": "[variables('vm1PublicIPName')]",
+      "apiVersion": "2018-10-01",
+      "tags": "[parameters('tags')]",
+      "location": "[resourceGroup().location]",
+      "sku": 
+      {
+        "name": "Standard"
       },
+      "properties": {
+        "publicIPAllocationMethod": "[parameters('publicIPAddressType')]",
+        "dnsSettings": {
+          "domainNameLabel": "[variables('vm1PublicIPDNSName')]"
+        }
+      }
+    },
+    {
+      "type": "Microsoft.Network/publicIPAddresses",
+      "name": "[variables('vm2PublicIPName')]",
+      "apiVersion": "2018-10-01",
+      "tags": "[parameters('tags')]",
+      "location": "[resourceGroup().location]",
+      "sku": 
+      {
+        "name": "Standard"
+      },
+      "properties": {
+        "publicIPAllocationMethod": "[parameters('publicIPAddressType')]",
+        "dnsSettings": {
+          "domainNameLabel": "[variables('vm2PublicIPDNSName')]"
+        }
+      }
+    },
+    {
+      "type": "Microsoft.Network/loadBalancers",
+      "name": "[parameters('publicLBName')]",
+      "apiVersion": "2018-10-01",
+      "tags": "[parameters('tags')]",
+      "location": "[resourceGroup().location]",
+      "sku": 
+      {
+        "name": "Standard"
+      },
+      "dependsOn": [
+        "[variables('publicIPID')]"
+      ],
+      "properties": {
+        "frontendIPConfigurations": [
+          {
+            "name": "[variables('network_LB_Public_FEName')]",
+            "properties": {
+              "publicIPAddress": {
+                "id": "[variables('publicIPID')]"
+              }
+            }
+          }
+        ],
+        "backendAddressPools": [
+          {
+            "name": "[variables('network_LB_Public_BEName')]"
+          }
+        ],
+        "loadBalancingRules": [
+          {
+            "properties": {
+              "frontendIPConfiguration": {
+                "id": "[concat(resourceId('Microsoft.Network/loadBalancers', parameters('publicLBName')), '/frontendIpConfigurations/', variables('network_LB_Public_FEName'))]"
+              },
+              "backendAddressPool": {
+                "id": "[concat(resourceId('Microsoft.Network/loadBalancers', parameters('publicLBName')), '/backendAddressPools/', variables('network_LB_Public_BEName'))]"
+              },
+              "probe": {
+                "id": "[concat(resourceId('Microsoft.Network/loadBalancers', parameters('publicLBName')), '/probes/lbprobe')]"
+              },
+              "protocol": "Tcp",
+              "frontendPort": 80,
+              "backendPort": 80,
+              "enableFloatingIP": true,
+              "idleTimeoutInMinutes": 15
+            },
+            "name": "PublicLBRule-FE1-http"
+          }
+        ],
+        "inboundNatRules": [
+          {
+            "name": "[variables('network_LB_Public_NatRule_SSH_fg1_Name')]",
+            "properties": {
+              "frontendIPConfiguration": {
+                "id": "[variables('network_LB_Public_FEId')]"
+              },
+              "protocol": "Tcp",
+              "frontendPort": 22,
+              "backendPort": 22,
+              "enableFloatingIP": false
+            }
+          },
+          {
+            "name": "[variables('network_LB_Public_NatRule_FGAdminPerm_fg1_Name')]",
+            "properties": {
+              "frontendIPConfiguration": {
+                "id": "[variables('network_LB_Public_FEId')]"
+              },
+              "protocol": "Tcp",
+              "frontendPort": 443,
+              "backendPort": 443,
+              "enableFloatingIP": false
+            }
+          }
+        ],
+        "probes": [
+          {
+            "properties": {
+              "protocol": "Tcp",
+              "port": 22,
+              "intervalInSeconds": 5,
+              "numberOfProbes": 2
+            },
+            "name": "lbprobe"
+          }
+        ]
+      }
+    },
+    {
+      "apiVersion": "2018-10-01",
+      "tags": "[parameters('tags')]",
+      "type": "Microsoft.Network/networkInterfaces",
+      "name": "[variables('network_NIC_fg11_Name')]",
+      "location": "[resourceGroup().location]",
+      "dependsOn": [
+        "[variables('network_LB_Public_Id')]",
+        "[variables('vm1PublicIPID')]"
+      ],
+      "properties": {
+        "ipConfigurations": [
+          {
+            "name": "ipconfig1",
+            "properties": {
+              "privateIPAllocationMethod": "Dynamic",
+              "subnet": {
+                "id": "[variables('subnet1Ref')]"
+              },
+              "loadBalancerBackendAddressPools": [
+                {
+                  "id": "[variables('network_LB_Public_BEId')]"
+                }
+              ],
+              "loadBalancerInboundNatRules": [
+                {
+                  "id": "[variables('network_LB_Public_NatRule_SSH_fg1_Id')]"
+                },
+                {
+                  "id": "[variables('network_LB_Public_NatRule_FGAdminPerm_fg1_Id')]"
+                }
+              ]
+            }
+          }
+        ],
+        "enableIPForwarding": true
+      }
+    },
+    {
+      "apiVersion": "2018-10-01",
+      "tags": "[parameters('tags')]",
+      "type": "Microsoft.Network/networkInterfaces",
+      "name": "[variables('network_NIC_fg21_Name')]",
+      "location": "[resourceGroup().location]",
+      "dependsOn": [
+        "[variables('network_LB_Public_Id')]",
+        "[variables('vm2PublicIPID')]"
+      ],
+      "properties": {
+        "ipConfigurations": [
+          {
+            "name": "ipconfig1",
+            "properties": {
+              "privateIPAllocationMethod": "Dynamic",
+              "subnet": {
+                "id": "[variables('subnet1Ref')]"
+              },
+              "loadBalancerBackendAddressPools": [
+                {
+                  "id": "[variables('network_LB_Public_BEId')]"
+                }
+              ]
+            }
+          }
+        ],
+        "enableIPForwarding": true
+      }
+    },
+    {
+      "apiVersion": "2018-10-01",
+      "tags": "[parameters('tags')]",
       "type": "Microsoft.Network/networkInterfaces",
       "name": "[variables('network_NIC_fg12_Name')]",
-      "location": "[parameters('location')]",
+      "location": "[resourceGroup().location]",
       "dependsOn": [
-        "[concat('Microsoft.Network/loadBalancers/', variables('internalLBName'))]",
-        "[concat('Microsoft.Resources/deployments/', 'SettingUpVirtualNetwork')]"
+        "[concat('Microsoft.Network/loadBalancers/', parameters('internalLBName'))]"
       ],
       "properties": {
         "ipConfigurations": [
@@ -816,7 +506,7 @@
               },
               "loadBalancerBackendAddressPools": [
                 {
-                  "id": "[variables('internalLB_BE2Id')]"
+                  "id": "[variables('internalLB_BEId')]"
                 }
               ]
             }
@@ -826,16 +516,13 @@
       }
     },
     {
-      "apiVersion": "[variables('apiVer')]",
-      "tags": {
-       "provider": "[toUpper(parameters('FortinetTags').provider)]"
-      },
+      "apiVersion": "2018-10-01",
+      "tags": "[parameters('tags')]",
       "type": "Microsoft.Network/networkInterfaces",
       "name": "[variables('network_NIC_fg22_Name')]",
-      "location": "[parameters('location')]",
+      "location": "[resourceGroup().location]",
       "dependsOn": [
-        "[concat('Microsoft.Network/loadBalancers/', variables('internalLBName'))]",
-        "[concat('Microsoft.Resources/deployments/', 'SettingUpVirtualNetwork')]"
+        "[concat('Microsoft.Network/loadBalancers/', parameters('internalLBName'))]"
       ],
       "properties": {
         "ipConfigurations": [
@@ -848,7 +535,7 @@
               },
               "loadBalancerBackendAddressPools": [
                 {
-                  "id": "[variables('internalLB_BE2Id')]"
+                  "id": "[variables('internalLB_BEId')]"
                 }
               ]
             }
@@ -858,17 +545,11 @@
       }
     },
     {
-      "apiVersion": "[variables('apiVer')]",
-      "tags": {
-       "provider": "[toUpper(parameters('FortinetTags').provider)]"
-      },
+      "apiVersion": "2018-10-01",
+      "tags": "[parameters('tags')]",
       "type": "Microsoft.Network/networkInterfaces",
       "name": "[variables('network_NIC_fg13_Name')]",
-      "location": "[parameters('location')]",
-      "dependsOn": [
-        "[concat('Microsoft.Network/loadBalancers/', variables('internalLBName'))]",
-        "[concat('Microsoft.Resources/deployments/', 'SettingUpVirtualNetwork')]"
-      ],
+      "location": "[resourceGroup().location]",
       "properties": {
         "ipConfigurations": [
           {
@@ -877,30 +558,18 @@
               "privateIPAllocationMethod": "Dynamic",
               "subnet": {
                 "id": "[variables('subnet3Ref')]"
-              },
-              "loadBalancerBackendAddressPools": [
-                {
-                  "id": "[variables('internalLB_BE3Id')]"
-                }
-              ]
+              }
             }
           }
-        ],
-        "enableIPForwarding": true
+        ]
       }
     },
     {
-      "apiVersion": "[variables('apiVer')]",
-      "tags": {
-       "provider": "[toUpper(parameters('FortinetTags').provider)]"
-      },
+      "apiVersion": "2018-10-01",
+      "tags": "[parameters('tags')]",
       "type": "Microsoft.Network/networkInterfaces",
       "name": "[variables('network_NIC_fg23_Name')]",
-      "location": "[parameters('location')]",
-      "dependsOn": [
-        "[concat('Microsoft.Network/loadBalancers/', variables('internalLBName'))]",
-        "[concat('Microsoft.Resources/deployments/', 'SettingUpVirtualNetwork')]"
-      ],
+      "location": "[resourceGroup().location]",
       "properties": {
         "ipConfigurations": [
           {
@@ -909,30 +578,18 @@
               "privateIPAllocationMethod": "Dynamic",
               "subnet": {
                 "id": "[variables('subnet3Ref')]"
-              },
-              "loadBalancerBackendAddressPools": [
-                {
-                  "id": "[variables('internalLB_BE3Id')]"
-                }
-              ]
+              }
             }
           }
-        ],
-        "enableIPForwarding": true
+        ]
       }
     },
     {
-      "apiVersion": "[variables('apiVer')]",
-      "tags": {
-       "provider": "[toUpper(parameters('FortinetTags').provider)]"
-      },
+      "apiVersion": "2018-10-01",
+      "tags": "[parameters('tags')]",
       "type": "Microsoft.Network/networkInterfaces",
       "name": "[variables('network_NIC_fg14_Name')]",
-      "location": "[parameters('location')]",
-      "dependsOn": [
-        "[concat('Microsoft.Network/loadBalancers/', variables('internalLBName'))]",
-        "[concat('Microsoft.Resources/deployments/', 'SettingUpVirtualNetwork')]"
-      ],
+      "location": "[resourceGroup().location]",
       "properties": {
         "ipConfigurations": [
           {
@@ -941,30 +598,18 @@
               "privateIPAllocationMethod": "Dynamic",
               "subnet": {
                 "id": "[variables('subnet4Ref')]"
-              },
-              "loadBalancerBackendAddressPools": [
-                {
-                  "id": "[variables('internalLB_BE4Id')]"
-                }
-              ]
+              }
             }
           }
-        ],
-        "enableIPForwarding": true
+        ]
       }
     },
     {
-      "apiVersion": "[variables('apiVer')]",
-      "tags": {
-       "provider": "[toUpper(parameters('FortinetTags').provider)]"
-      },
+      "apiVersion": "2018-10-01",
+      "tags": "[parameters('tags')]",
       "type": "Microsoft.Network/networkInterfaces",
       "name": "[variables('network_NIC_fg24_Name')]",
-      "location": "[parameters('location')]",
-      "dependsOn": [
-        "[concat('Microsoft.Network/loadBalancers/', variables('internalLBName'))]",
-        "[concat('Microsoft.Resources/deployments/', 'SettingUpVirtualNetwork')]"
-      ],
+      "location": "[resourceGroup().location]",
       "properties": {
         "ipConfigurations": [
           {
@@ -973,47 +618,39 @@
               "privateIPAllocationMethod": "Dynamic",
               "subnet": {
                 "id": "[variables('subnet4Ref')]"
-              },
-              "loadBalancerBackendAddressPools": [
-                {
-                  "id": "[variables('internalLB_BE4Id')]"
-                }
-              ]
+              }
             }
           }
-        ],
-        "enableIPForwarding": true
+        ]
       }
     },
     {
       "type": "Microsoft.Compute/virtualMachines",
-      "name": "[variables('compute_VM_fg1_Name')]",
-      "apiVersion": "2017-03-30",
-      "tags": {
-       "provider": "[toUpper(parameters('FortinetTags').provider)]"
-      },
-      "location": "[parameters('location')]",
+      "name": "[parameters('vmName')]",
+      "apiVersion": "2018-10-01",
+      "tags": "[parameters('tags')]",
+      "location": "[resourceGroup().location]",
       "plan": {
         "name": "[parameters('FortiGateImageSKU')]",
         "publisher": "fortinet",
         "product": "fortinet_fortigate-vm_v5"
       },
       "dependsOn": [
-        "[concat('Microsoft.Resources/deployments/', 'SettingUpPublicIPandFollowing')]",
+        "[concat('Microsoft.Network/networkInterfaces/',variables('network_NIC_fg11_Name'))]",
         "[concat('Microsoft.Network/networkInterfaces/',variables('network_NIC_fg12_Name'))]",
         "[concat('Microsoft.Network/networkInterfaces/',variables('network_NIC_fg13_Name'))]",
         "[concat('Microsoft.Network/networkInterfaces/',variables('network_NIC_fg14_Name'))]",
-        "[concat('Microsoft.Compute/availabilitySets/',variables('compute_AvailabilitySet_FG_Name'))]"
+        "[concat('Microsoft.Compute/availabilitySets/',parameters('availabilitySetName'))]"
       ],
       "properties": {
         "hardwareProfile": {
-          "vmSize": "[variables('vmSize')]"
+          "vmSize": "[parameters('vmSize')]"
         },
         "availabilitySet": {
-          "id": "[variables('compute_AvailabilitySet_FG_Id')]"
+          "id": "[variables('availabilitySetId')]"
         },
         "osProfile": {
-          "computerName": "[variables('compute_VM_fg1_Name')]",
+          "computerName": "[parameters('vmName')]",
           "adminUsername": "[parameters('adminUsername')]",
           "adminPassword": "[parameters('adminPassword')]"
         },
@@ -1025,11 +662,13 @@
             "version": "[parameters('FortiGateVersion')]"
           },
           "osDisk": {
+            "name": "[concat(parameters('vmName'), '-os')]",
             "createOption": "FromImage"
           },
           "dataDisks": [
             {
-              "diskSizeGB": "30",
+              "name": "[concat(parameters('vmName'), '-data01')]",
+              "diskSizeGB": 30,
               "lun": 0,
               "createOption": "Empty"
             }
@@ -1067,33 +706,31 @@
     },
     {
       "type": "Microsoft.Compute/virtualMachines",
-      "name": "[variables('compute_VM_fg2_Name')]",
-      "apiVersion": "2017-03-30",
-      "tags": {
-       "provider": "[toUpper(parameters('FortinetTags').provider)]"
-      },
-      "location": "[parameters('location')]",
+      "name": "[parameters('vm2Name')]",
+      "apiVersion": "2018-10-01",
+      "tags": "[parameters('tags')]",
+      "location": "[resourceGroup().location]",
       "plan": {
         "name": "[parameters('FortiGateImageSKU')]",
         "publisher": "fortinet",
         "product": "fortinet_fortigate-vm_v5"
       },
       "dependsOn": [
-        "[concat('Microsoft.Resources/deployments/', 'SettingUpPublicIPandFollowing')]",
+        "[concat('Microsoft.Network/networkInterfaces/',variables('network_NIC_fg21_Name'))]",
         "[concat('Microsoft.Network/networkInterfaces/',variables('network_NIC_fg22_Name'))]",
         "[concat('Microsoft.Network/networkInterfaces/',variables('network_NIC_fg23_Name'))]",
         "[concat('Microsoft.Network/networkInterfaces/',variables('network_NIC_fg24_Name'))]",
-        "[concat('Microsoft.Compute/availabilitySets/',variables('compute_AvailabilitySet_FG_Name'))]"
+        "[concat('Microsoft.Compute/availabilitySets/',parameters('availabilitySetName'))]"
       ],
       "properties": {
         "hardwareProfile": {
-          "vmSize": "[variables('vmSize')]"
+          "vmSize": "[parameters('vmSize')]"
         },
         "availabilitySet": {
-          "id": "[variables('compute_AvailabilitySet_FG_Id')]"
+          "id": "[variables('availabilitySetId')]"
         },
         "osProfile": {
-          "computerName": "[variables('compute_VM_fg2_Name')]",
+          "computerName": "[parameters('vm2Name')]",
           "adminUsername": "[parameters('adminUsername')]",
           "adminPassword": "[parameters('adminPassword')]"
         },
@@ -1105,11 +742,13 @@
             "version": "[parameters('FortiGateVersion')]"
           },
           "osDisk": {
+            "name": "[concat(parameters('vm2Name'), '-os')]",
             "createOption": "FromImage"
           },
           "dataDisks": [
             {
-              "diskSizeGB": "30",
+              "name": "[concat(parameters('vm2Name'), '-data01')]",
+              "diskSizeGB": 30,
               "lun": 0,
               "createOption": "Empty"
             }
